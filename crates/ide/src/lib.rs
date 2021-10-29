@@ -83,7 +83,7 @@ pub use crate::{
     join_lines::JoinLinesConfig,
     markup::Markup,
     move_item::Direction,
-    prime_caches::PrimeCachesProgress,
+    prime_caches::{ParallelPrimeCachesProgress, PrimeCachesProgress},
     references::ReferenceSearchResult,
     rename::RenameError,
     runnables::{Runnable, RunnableKind, TestId},
@@ -241,6 +241,13 @@ impl Analysis {
         F: Fn(PrimeCachesProgress) + Sync + std::panic::UnwindSafe,
     {
         self.with_db(move |db| prime_caches::prime_caches(db, &cb))
+    }
+
+    pub fn parallel_prime_caches<F>(&self, cb: F) -> Cancellable<()>
+    where
+        F: Fn(ParallelPrimeCachesProgress) + Sync + std::panic::UnwindSafe,
+    {
+        self.with_db(move |db| prime_caches::parallel_prime_caches(db, &cb))
     }
 
     /// Gets the text of the source file.

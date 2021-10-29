@@ -2,7 +2,7 @@
 //! requests/replies and notifications back to the client.
 use std::{
     fmt,
-    sync::Arc,
+    sync::{atomic::AtomicUsize, Arc},
     time::{Duration, Instant},
 };
 
@@ -502,10 +502,26 @@ impl GlobalState {
             self.task_pool.handle.spawn_with_sender({
                 let analysis = self.snapshot().analysis;
                 move |sender| {
+                    // todo: upgrade to use new api with more refined progress reporting.
+
+                    let n_total = AtomicUsize::new(0);
+                    let n_done = AtomicUsize::new(0);
                     sender.send(Task::PrimeCaches(PrimeCachesProgress::Begin)).unwrap();
-                    let res = analysis.prime_caches(|progress| {
-                        let report = PrimeCachesProgress::Report(progress);
-                        sender.send(Task::PrimeCaches(report)).unwrap();
+                    let res = analysis.parallel_prime_caches(|progress| match progress {
+                        ide::ParallelPrimeCachesProgress::BeginPriming { n_total: t } => {
+                            n_total.store(t, std::sync::atomic::Ordering::Relaxed);
+                        }
+
+                        ide::ParallelPrimeCachesProgress::EndCrate { crate_name, .. } => {
+                            let done = n_done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let report = PrimeCachesProgress::Report(ide::PrimeCachesProgress {
+                                n_done: done,
+                                n_total: n_total.load(std::sync::atomic::Ordering::Relaxed),
+                                on_crate: crate_name,
+                            });
+                            sender.send(Task::PrimeCaches(report)).unwrap();
+                        }
+                        _ => {}
                     });
                     sender
                         .send(Task::PrimeCaches(PrimeCachesProgress::End {
