@@ -512,7 +512,7 @@ impl GlobalState {
                             n_total.store(t, std::sync::atomic::Ordering::Relaxed);
                         }
 
-                        ide::ParallelPrimeCachesProgress::EndCrate { crate_name, .. } => {
+                        ide::ParallelPrimeCachesProgress::BeginCrate { crate_name, .. } => {
                             let done = n_done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let report = PrimeCachesProgress::Report(ide::PrimeCachesProgress {
                                 n_done: done,

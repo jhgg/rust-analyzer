@@ -96,7 +96,7 @@ pub(crate) fn parallel_prime_caches(
         let (work_sender, work_receiver) = crossbeam_channel::unbounded::<(CrateId, String)>();
         let (result_sender, result_receiver) = crossbeam_channel::unbounded();
 
-        for _ in 0..16 {
+        for _ in 0..60 {
             let work_receiver = work_receiver.clone();
             let result_sender = result_sender.clone();
             let db = db.snapshot();
@@ -140,15 +140,31 @@ pub(crate) fn parallel_prime_caches(
 
         send_ready(&graph, &work_sender, &mut tg);
 
-        for result in result_receiver {
-            let mut is_cancelled = false;
-            if let ParallelPrimeCachesProgress::EndCrate { crate_id, cancelled, .. } = &result {
-                tg.mark_done(*crate_id);
-                is_cancelled = *cancelled;
+        let mut num_crates_indexing = 0;
 
-                if !is_cancelled {
-                    send_ready(&graph, &work_sender, &mut tg);
+        // hack: clean up lol...
+        for mut result in result_receiver {
+            let mut is_cancelled = false;
+            match &mut result {
+                ParallelPrimeCachesProgress::BeginCrate { crate_name, .. } => {
+                    if num_crates_indexing > 1 {
+                        *crate_name = format!("{} + {} crates", crate_name, num_crates_indexing);
+                    }
+                    num_crates_indexing += 1;
                 }
+                ParallelPrimeCachesProgress::EndCrate { crate_id, cancelled, crate_name } => {
+                    num_crates_indexing -= 1;
+                    if num_crates_indexing > 1 {
+                        *crate_name = format!("{} + {} crates", crate_name, num_crates_indexing);
+                    }
+                    tg.mark_done(*crate_id);
+                    is_cancelled = *cancelled;
+
+                    if !is_cancelled {
+                        send_ready(&graph, &work_sender, &mut tg);
+                    }
+                }
+                _ => (),
             }
 
             (cb)(result);
