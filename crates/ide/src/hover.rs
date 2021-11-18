@@ -69,7 +69,7 @@ impl HoverAction {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct HoverGotoTypeData {
     pub mod_path: String,
     pub nav: NavigationTarget,
@@ -136,11 +136,12 @@ pub(crate) fn hover(
         .flatten()
         .unique_by(|&(def, _)| def)
         .filter_map(|(def, node)| hover_for_definition(sema, file_id, def, &node, config))
-        .reduce(|mut acc, HoverResult { markup, actions }| {
+        .reduce(|mut acc: HoverResult, HoverResult { markup, actions }| {
             acc.actions.extend(actions);
             acc.markup = Markup::from(format!("{}\n---\n{}", acc.markup, markup));
             acc
         });
+
     if result.is_none() {
         // fallbacks, show keywords or types
         if let Some(res) = render::keyword(sema, config, &original_token) {

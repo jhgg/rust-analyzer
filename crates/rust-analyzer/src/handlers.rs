@@ -27,6 +27,7 @@ use lsp_types::{
     TextDocumentIdentifier, Url, WorkspaceEdit,
 };
 use project_model::{ManifestPath, ProjectWorkspace, TargetKind};
+use rustc_hash::FxHashSet;
 use serde_json::json;
 use stdx::{format_to, never};
 use syntax::{algo, ast, AstNode, TextRange, TextSize, T};
@@ -1632,7 +1633,7 @@ fn runnable_action_links(
 
 fn goto_type_action_links(
     snap: &GlobalStateSnapshot,
-    nav_targets: &[HoverGotoTypeData],
+    nav_targets: &[&HoverGotoTypeData],
 ) -> Option<lsp_ext::CommandLinkGroup> {
     if !snap.config.hover_actions().goto_type_def
         || nav_targets.is_empty()
@@ -1657,15 +1658,52 @@ fn prepare_hover_actions(
     snap: &GlobalStateSnapshot,
     actions: &[HoverAction],
 ) -> Vec<lsp_ext::CommandLinkGroup> {
-    actions
-        .iter()
-        .filter_map(|it| match it {
-            HoverAction::Implementation(position) => show_impl_command_link(snap, position),
-            HoverAction::Reference(position) => show_ref_command_link(snap, position),
-            HoverAction::Runnable(r) => runnable_action_links(snap, r.clone()),
-            HoverAction::GoToType(targets) => goto_type_action_links(snap, targets),
-        })
-        .collect()
+    // Try to maintain sort order.
+    let mut nav_targets = Vec::new();
+    let mut seen_nav_targets = FxHashSet::default();
+
+    // Dedupes each type by storing the first one seen in the actions array.
+    let mut impl_command_link = None;
+    let mut ref_command_link = None;
+    let mut runnable_action_command_link = None;
+
+    for action in actions {
+        match action {
+            HoverAction::GoToType(targets) => {
+                for target in targets {
+                    if seen_nav_targets.contains(target) {
+                        continue;
+                    }
+
+                    seen_nav_targets.insert(target);
+                    nav_targets.push(target);
+                }
+            }
+            HoverAction::Implementation(position) => {
+                if impl_command_link.is_none() {
+                    impl_command_link = show_impl_command_link(snap, position);
+                }
+            }
+            HoverAction::Reference(position) => {
+                if ref_command_link.is_none() {
+                    ref_command_link = show_ref_command_link(snap, position);
+                }
+            }
+            HoverAction::Runnable(r) => {
+                if runnable_action_command_link.is_none() {
+                    runnable_action_command_link = runnable_action_links(snap, r.clone());
+                }
+            }
+        };
+    }
+
+    let mut command_link_groups = Vec::with_capacity(4);
+    command_link_groups.extend(impl_command_link);
+    command_link_groups.extend(ref_command_link);
+    command_link_groups.extend(runnable_action_command_link);
+    command_link_groups.extend(goto_type_action_links(snap, &nav_targets));
+
+    command_link_groups
 }
 
 fn should_skip_target(runnable: &Runnable, cargo_spec: Option<&CargoTargetSpec>) -> bool {

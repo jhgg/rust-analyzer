@@ -173,7 +173,7 @@ m!(ab$0c);
             ---
 
             Outer
-            "#]],
+        "#]],
     );
 }
 
@@ -1133,6 +1133,34 @@ fn foo() {
                 ```
             "#]],
     );
+}
+
+#[test]
+fn test_hover_multiple_actions() {
+    check(
+        r#"
+struct Bar;
+struct Foo { bar: Bar }
+
+fn foo(Foo { b$0ar }: &Foo) {}
+        "#,
+        expect![[r#"
+            *bar*
+
+            ```rust
+            bar: &Bar
+            ```
+            ---
+
+            ```rust
+            test::Foo
+            ```
+
+            ```rust
+            bar: Bar
+            ```
+        "#]],
+    )
 }
 
 #[test]
@@ -2749,21 +2777,21 @@ fn main() {
 }
 "#,
         expect![[r#"
-                *f*
+            *f*
 
-                ```rust
-                f: &i32
-                ```
-                ---
+            ```rust
+            f: &i32
+            ```
+            ---
 
-                ```rust
-                test::S
-                ```
+            ```rust
+            test::S
+            ```
 
-                ```rust
-                f: i32
-                ```
-            "#]],
+            ```rust
+            f: i32
+            ```
+        "#]],
     );
 }
 
