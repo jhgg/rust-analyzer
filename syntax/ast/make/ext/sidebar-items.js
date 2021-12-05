@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["empty_block_expr",""],["expr_todo",""],["expr_unreachable",""],["field_from_idents",""],["ident_path",""],["path_from_idents",""],["simple_ident_pat",""],["ty_bool",""],["ty_option",""],["ty_result",""]]});
