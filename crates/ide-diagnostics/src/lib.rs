@@ -68,7 +68,7 @@ mod tests;
 use hir::{diagnostics::AnyDiagnostic, InFile, Semantics};
 use ide_db::{
     assists::{Assist, AssistId, AssistKind, AssistResolveStrategy},
-    base_db::{FileId, FileRange, SourceDatabase},
+    base_db::{FileId, FileRange, SourceDatabase, SourceDatabaseExt},
     imports::insert_use::InsertUseConfig,
     label::Label,
     source_change::SourceChange,
@@ -222,6 +222,16 @@ pub fn diagnostics(
 ) -> Vec<Diagnostic> {
     let _p = profile::span("diagnostics");
     let sema = Semantics::new(db);
+    // Ensure that the file we want diagnostics for is an actual rust file, otherwise, we should not attempt to parse
+    // the file.
+    let root = db.source_root(db.file_source_root(file_id));
+    let extension = root.path_for_file(&file_id).and_then(|x| x.extension());
+    if let Some(extension) = extension {
+        if extension != "rs" {
+            return Vec::new();
+        }
+    }
+
     let parse = db.parse(file_id);
     let mut res = Vec::new();
 

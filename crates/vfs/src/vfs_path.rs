@@ -1,5 +1,5 @@
 //! Abstract-ish representation of paths for VFS.
-use std::fmt;
+use std::{ffi::OsStr, fmt};
 
 use paths::{AbsPath, AbsPathBuf, RelPath};
 
@@ -36,6 +36,14 @@ impl VfsPath {
         match &self.0 {
             VfsPathRepr::PathBuf(it) => Some(it.as_path()),
             VfsPathRepr::VirtualPath(_) => None,
+        }
+    }
+
+    /// Returns the file extension of the given `VfsPath`.
+    pub fn extension(&self) -> Option<&str> {
+        match &self.0 {
+            VfsPathRepr::PathBuf(it) => it.extension().and_then(OsStr::to_str),
+            VfsPathRepr::VirtualPath(it) => it.name_and_extension().map(|(_, ext)| ext).flatten(),
         }
     }
 
